@@ -13,8 +13,7 @@ import {
 } from './types';
 import { IPDEngine } from './ipd-engine';
 import { 
-  Play, RotateCcw, Settings, TrendingUp, Brain, Cpu, 
-  Download, Upload, Copy, Check, BarChart3, Info, Zap
+  Play, RotateCcw, Settings, TrendingUp, Brain, Download, Upload, Copy, Check, Zap
 } from 'lucide-react';
 
 const PARAM_COLORS = ["#6366f1", "#ec4899", "#10b981", "#f59e0b", "#ef4444", "#06b6d4", "#8b5cf6", "#14b8a6"];
@@ -58,12 +57,18 @@ const App: React.FC = () => {
 
   const handleTrain = () => {
     setIsTraining(true);
+    // Use requestAnimationFrame to let the UI update the loading state before the heavy simulation starts
     requestAnimationFrame(() => {
       setTimeout(() => {
-        const engine = new IPDEngine(config);
-        const { blocks } = engine.run();
-        setResults(blocks);
-        setIsTraining(false);
+        try {
+          const engine = new IPDEngine(config);
+          const { blocks } = engine.run();
+          setResults(blocks);
+        } catch (error) {
+          console.error("Simulation failed:", error);
+        } finally {
+          setIsTraining(false);
+        }
       }, 50);
     });
   };
@@ -340,3 +345,5 @@ const InputGroup: React.FC<{ label: string, value: any, onChange: (v: string) =>
     />
   </div>
 );
+
+export default App;
