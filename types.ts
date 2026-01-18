@@ -1,4 +1,3 @@
-
 export enum Action {
   C = 0,
   D = 1
@@ -85,3 +84,4 @@ export interface BlockResult {
   meanExplorationParam: number;
   parameters: Record<string, number>;
 }
+
