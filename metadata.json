@@ -1,0 +1,5 @@
+
+{
+  "name": "Iterated Prisoner’s Dilemma Trainer",
+  "description": "A reinforcement learning simulation platform to study agent behavior in the Iterated Prisoner's Dilemma environment with various learning algorithms and opponent strategies."
+}
