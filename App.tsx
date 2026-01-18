@@ -1,7 +1,6 @@
-
 import React, { useState, useRef } from 'react';
 import { 
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer 
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area 
 } from 'recharts';
 import { 
   SimulationConfig, 
@@ -12,16 +11,13 @@ import {
   ExplorationSchedule, 
   BlockResult
 } from './types';
-import { IPDEngine } from './services/ipd-engine';
+import { IPDEngine } from './ipd-engine';
 import { 
   Play, RotateCcw, Settings, TrendingUp, Brain, Cpu, 
-  Download, Upload, Copy, Check, BarChart3, Info 
+  Download, Upload, Copy, Check, BarChart3, Info, Zap
 } from 'lucide-react';
 
-const PARAM_COLORS = [
-  "#6366f1", "#ec4899", "#10b981", "#f59e0b", 
-  "#ef4444", "#06b6d4", "#8b5cf6", "#14b8a6"
-];
+const PARAM_COLORS = ["#6366f1", "#ec4899", "#10b981", "#f59e0b", "#ef4444", "#06b6d4", "#8b5cf6", "#14b8a6"];
 
 const App: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -29,10 +25,7 @@ const App: React.FC = () => {
     nTrials: 1000,
     blockSize: 50,
     seed: 42,
-    payoff: [
-      [3, 0], // C vs C, C vs D
-      [5, 1]  // D vs C, D vs D
-    ],
+    payoff: [[3, 0], [5, 1]],
     agentStrategy: Strategy.RL_AGENT,
     opponentStrategy: Strategy.TIT_FOR_TAT,
     pCooperate: 0.5,
@@ -53,32 +46,29 @@ const App: React.FC = () => {
       slope: 0.002,
       startTrial: 100
     },
-    initialQ: [
-      [0.5, 0.5], [0.5, 0.5], [0.5, 0.5], [0.5, 0.5]
-    ],
-    initialH: [
-      [0, 0], [0, 0], [0, 0], [0, 0]
-    ]
+    initialQ: [[0.5, 0.5], [0.5, 0.5], [0.5, 0.5], [0.5, 0.5]],
+    initialH: [[0, 0], [0, 0], [0, 0], [0, 0]]
   });
 
   const [results, setResults] = useState<BlockResult[]>([]);
   const [isTraining, setIsTraining] = useState(false);
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
-  const [filename, setFilename] = useState("ipd-config.json");
+  const [filename, setFilename] = useState("ipd-experiment.json");
   const [copied, setCopied] = useState(false);
 
   const handleTrain = () => {
     setIsTraining(true);
-    setTimeout(() => {
-      const engine = new IPDEngine(config);
-      const { blocks } = engine.run();
-      setResults(blocks);
-      setIsTraining(false);
-    }, 10);
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        const engine = new IPDEngine(config);
+        const { blocks } = engine.run();
+        setResults(blocks);
+        setIsTraining(false);
+      }, 50);
+    });
   };
 
   const handleReset = () => setResults([]);
-
   const handleCopyConfig = () => {
     navigator.clipboard.writeText(JSON.stringify(config, null, 2));
     setCopied(true);
@@ -91,264 +81,209 @@ const App: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    let finalFilename = filename.trim() || "ipd-config.json";
-    if (!finalFilename.toLowerCase().endsWith('.json')) finalFilename += ".json";
-    link.download = finalFilename;
+    link.download = filename.endsWith('.json') ? filename : `${filename}.json`;
     document.body.appendChild(link);
     link.click();
-    setTimeout(() => {
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-    }, 100);
+    document.body.removeChild(link);
     setIsDownloadModalOpen(false);
-  };
-
-  const handleUploadConfig = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const newConfig = JSON.parse(e.target?.result as string);
-        if (newConfig && typeof newConfig === 'object') {
-          setConfig(newConfig);
-          setResults([]);
-        }
-      } catch (err) {
-        alert("Invalid configuration file.");
-      }
-    };
-    reader.readAsText(file);
-    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const updateConfig = (key: keyof SimulationConfig, value: any) => {
     setConfig(prev => ({ ...prev, [key]: value }));
   };
 
-  const updateExplorationConfig = (key: keyof SimulationConfig['explorationConfig'], value: any) => {
-    setConfig(prev => ({
-      ...prev,
-      explorationConfig: { ...prev.explorationConfig, [key]: value }
-    }));
-  };
-
-  const explorationLabel = config.actionSelection === ActionSelection.SOFTMAX ? 'Tau (Temp)' : 'Epsilon (ε)';
-  const parameterKeys = results.length > 0 ? Object.keys(results[0].parameters) : [];
   const isRL = config.agentStrategy === Strategy.RL_AGENT;
+  const parameterKeys = results.length > 0 ? Object.keys(results[0].parameters) : [];
 
   return (
-    <div className="flex flex-col md:flex-row h-screen w-screen overflow-hidden bg-gray-50 font-sans">
-      {/* Sidebar */}
-      <aside className="w-full md:w-85 bg-white border-r border-gray-200 overflow-y-auto p-6 shadow-sm flex-shrink-0 pb-24">
-        <div className="flex items-center gap-2 mb-8">
-          <TrendingUp className="text-indigo-600" />
-          <h1 className="text-xl font-bold tracking-tight">IPD Trainer</h1>
+    <div className="flex flex-col md:flex-row h-screen w-screen overflow-hidden bg-slate-50">
+      <aside className="w-full md:w-80 bg-white border-r border-slate-200 overflow-y-auto p-6 flex-shrink-0 flex flex-col pb-24 shadow-xl shadow-slate-200/50">
+        <div className="flex items-center gap-3 mb-10">
+          <div className="bg-indigo-600 p-2 rounded-xl shadow-lg shadow-indigo-200">
+            <TrendingUp className="text-white" size={20} />
+          </div>
+          <h1 className="text-xl font-extrabold tracking-tight text-slate-800">IPD Trainer</h1>
         </div>
 
-        <div className="space-y-8">
-          {/* File Actions */}
-          <div className="flex flex-wrap gap-2">
-            <button onClick={() => setIsDownloadModalOpen(true)} className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs font-bold rounded-lg border border-gray-200 transition-colors">
-              <Download size={14} /> Save
-            </button>
-            <button onClick={() => fileInputRef.current?.click()} className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs font-bold rounded-lg border border-gray-200 transition-colors">
-              <Upload size={14} /> Load
-            </button>
-            <button onClick={handleCopyConfig} className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-gray-50 hover:bg-gray-100 text-gray-700 text-xs font-bold rounded-lg border border-gray-200 transition-colors">
-              {copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />} Copy
-            </button>
-            <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={handleUploadConfig} />
+        <div className="space-y-8 flex-1">
+          <div className="grid grid-cols-3 gap-2">
+            <SidebarBtn onClick={() => setIsDownloadModalOpen(true)} icon={<Download size={14}/>} label="Save" />
+            <SidebarBtn onClick={() => fileInputRef.current?.click()} icon={<Upload size={14}/>} label="Load" />
+            <SidebarBtn onClick={handleCopyConfig} icon={copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14}/>} label="Copy" />
+            <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={(e) => {
+               const file = e.target.files?.[0];
+               if (!file) return;
+               const reader = new FileReader();
+               reader.onload = (ev) => {
+                 try {
+                   setConfig(JSON.parse(ev.target?.result as string));
+                   setResults([]);
+                 } catch { alert("Error loading file."); }
+               };
+               reader.readAsText(file);
+            }} />
           </div>
 
-          {/* Simulation Settings */}
           <section>
-            <h2 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
-              <Settings size={14} /> Simulation
-            </h2>
+            <SectionHeader icon={<Settings size={14}/>} title="Environment" />
             <div className="space-y-4">
+              <InputGroup label="Total Trials" value={config.nTrials} onChange={v => updateConfig('nTrials', parseInt(v))} />
               <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2">
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Total Trials</label>
-                  <input type="number" className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-indigo-500 outline-none" value={config.nTrials} onChange={e => updateConfig('nTrials', parseInt(e.target.value))} />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Block Size</label>
-                  <input type="number" className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm" value={config.blockSize} onChange={e => updateConfig('blockSize', parseInt(e.target.value))} />
-                </div>
-                <div>
-                  <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Seed</label>
-                  <input type="number" className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm" value={config.seed} onChange={e => updateConfig('seed', parseInt(e.target.value))} />
-                </div>
+                <InputGroup label="Block Size" value={config.blockSize} onChange={v => updateConfig('blockSize', parseInt(v))} />
+                <InputGroup label="RNG Seed" value={config.seed} onChange={v => updateConfig('seed', parseInt(v))} />
               </div>
             </div>
           </section>
 
-          {/* Strategies */}
-          <section className="space-y-5">
+          <section className="space-y-4">
             <div>
-              <label className="block text-[10px] font-bold text-gray-400 uppercase mb-2">Agent Strategy</label>
-              <select className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500" value={config.agentStrategy} onChange={e => updateConfig('agentStrategy', e.target.value)}>
-                <option value={Strategy.RL_AGENT}>🤖 RL Agent</option>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Agent Strategy</label>
+              <select className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none" value={config.agentStrategy} onChange={e => updateConfig('agentStrategy', e.target.value)}>
+                <option value={Strategy.RL_AGENT}>🤖 Reinforcement Learner</option>
                 <option value={Strategy.TIT_FOR_TAT}>🤝 Tit-for-Tat</option>
                 <option value={Strategy.ALWAYS_C}>🕊️ Always Cooperate</option>
                 <option value={Strategy.ALWAYS_D}>⚔️ Always Defect</option>
-                <option value={Strategy.RANDOM}>🎲 Random</option>
-                <option value={Strategy.GRIM_TRIGGER}>👿 Grim Trigger</option>
-                <option value={Strategy.PAVLOV}>🧠 Pavlov</option>
               </select>
             </div>
             <div>
-              <label className="block text-[10px] font-bold text-gray-400 uppercase mb-2">Opponent Strategy</label>
-              <select className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500" value={config.opponentStrategy} onChange={e => updateConfig('opponentStrategy', e.target.value)}>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">Opponent Strategy</label>
+              <select className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none" value={config.opponentStrategy} onChange={e => updateConfig('opponentStrategy', e.target.value)}>
                 <option value={Strategy.TIT_FOR_TAT}>🤝 Tit-for-Tat</option>
                 <option value={Strategy.GRIM_TRIGGER}>👿 Grim Trigger</option>
-                <option value={Strategy.PAVLOV}>🧠 Pavlov</option>
-                <option value={Strategy.ALWAYS_C}>🕊️ Always Cooperate</option>
-                <option value={Strategy.ALWAYS_D}>⚔️ Always Defect</option>
-                <option value={Strategy.RANDOM}>🎲 Random</option>
+                <option value={Strategy.PAVLOV}>🧠 Pavlov (WSLS)</option>
+                <option value={Strategy.RANDOM}>🎲 Random Noise</option>
               </select>
             </div>
           </section>
 
-          {/* Brain Config */}
           {isRL && (
-            <section className="p-4 bg-indigo-50/50 rounded-xl border border-indigo-100 space-y-4">
-              <h2 className="text-[10px] font-black text-indigo-400 uppercase tracking-widest flex items-center gap-2">
-                <Brain size={14} /> Agent Intelligence
-              </h2>
+            <section className="p-4 bg-indigo-50 rounded-2xl border border-indigo-100 space-y-4">
+              <SectionHeader icon={<Brain size={14} className="text-indigo-600"/>} title="Neural Config" className="text-indigo-600" />
               <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">State Memory</label>
-                <select className="w-full px-3 py-2 bg-white border border-indigo-200 rounded-lg text-sm" value={config.stateMemory} onChange={e => updateConfig('stateMemory', parseInt(e.target.value))}>
-                  <option value={StateMemory.S1_GLOBAL}>1 State (Reactive)</option>
-                  <option value={StateMemory.S2_OPP_MOVE}>2 State (Memory-1)</option>
-                  <option value={StateMemory.S4_BOTH_MOVE}>4 State (Full Memory)</option>
+                <label className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest mb-1 block">Memory Window</label>
+                <select className="w-full px-3 py-2 bg-white border border-indigo-200 rounded-xl text-sm font-medium" value={config.stateMemory} onChange={e => updateConfig('stateMemory', parseInt(e.target.value))}>
+                  <option value={StateMemory.S1_GLOBAL}>Reactive (Memoryless)</option>
+                  <option value={StateMemory.S2_OPP_MOVE}>Memory-1 (Last Opp Move)</option>
+                  <option value={StateMemory.S4_BOTH_MOVE}>Full Context (Last Pair)</option>
                 </select>
               </div>
-              <div>
-                <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Learning Algorithm</label>
-                <select className="w-full px-3 py-2 bg-white border border-indigo-200 rounded-lg text-sm" value={config.learningAlgorithm} onChange={e => updateConfig('learningAlgorithm', e.target.value)}>
-                  <option value={LearningAlgorithm.Q_INCREMENTAL}>Q-Learning</option>
-                  <option value={LearningAlgorithm.REINFORCE_BASELINE}>REINFORCE + Base</option>
-                  <option value={LearningAlgorithm.PREFERENCE}>REINFORCE (No Base)</option>
-                </select>
-              </div>
+              <InputGroup label="Learning Rate (α)" type="number" step="0.01" value={config.alpha || 0.1} onChange={v => updateConfig('alpha', parseFloat(v))} />
             </section>
           )}
         </div>
 
-        {/* Floating Action Bar */}
-        <div className="fixed bottom-0 left-0 w-full md:w-80 bg-white/80 backdrop-blur-md pt-4 pb-6 px-6 border-t border-gray-100 flex gap-2 shadow-2xl z-20">
-          <button onClick={handleTrain} disabled={isTraining} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 shadow-lg shadow-indigo-200">
-            <Play size={18} fill="currentColor" /> {isTraining ? 'Training...' : 'Run Simulation'}
-          </button>
-          <button onClick={handleReset} className="bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-3 px-4 rounded-xl flex items-center justify-center transition-colors">
-            <RotateCcw size={18} />
-          </button>
+        <div className="fixed bottom-0 left-0 w-full md:w-80 bg-white/90 backdrop-blur-md pt-4 pb-8 px-6 border-t border-slate-100 z-30">
+          <div className="flex gap-2">
+            <button 
+              onClick={handleTrain} 
+              disabled={isTraining}
+              className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-400 text-white font-bold py-4 rounded-2xl flex items-center justify-center gap-2 transition-all active:scale-95 shadow-xl shadow-indigo-200"
+            >
+              {isTraining ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Play size={20} fill="currentColor" />}
+              {isTraining ? 'Simulating...' : 'Run Simulation'}
+            </button>
+            <button onClick={handleReset} className="p-4 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-2xl transition-colors">
+              <RotateCcw size={20} />
+            </button>
+          </div>
         </div>
       </aside>
 
-      {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto p-4 md:p-8 lg:p-12 bg-gray-50">
-        <div className="max-w-5xl mx-auto space-y-8 pb-12">
+      <main className="flex-1 overflow-y-auto bg-slate-50 p-6 md:p-12">
+        <div className="max-w-6xl mx-auto space-y-8">
           {results.length === 0 ? (
-            <div className="h-[70vh] flex flex-col items-center justify-center text-center">
-              <div className="w-20 h-20 bg-indigo-100 rounded-full flex items-center justify-center mb-6 animate-pulse">
-                <Cpu size={40} className="text-indigo-600" />
+            <div className="h-[70vh] flex flex-col items-center justify-center text-center opacity-80">
+              <div className="w-24 h-24 bg-indigo-100 rounded-full flex items-center justify-center mb-8 animate-bounce">
+                <Zap size={48} className="text-indigo-600" />
               </div>
-              <h2 className="text-4xl font-black text-gray-900 mb-4 tracking-tight">IPD Training Lab</h2>
-              <p className="text-gray-500 max-w-md text-lg leading-relaxed">Configure your agent's learning parameters and click <span className="text-indigo-600 font-bold">Run Simulation</span> to analyze the emergence of cooperation.</p>
+              <h2 className="text-4xl font-black text-slate-900 mb-4 tracking-tighter">Ready to Train?</h2>
+              <p className="text-slate-500 max-w-sm text-lg font-medium leading-relaxed">Adjust your agent's learning parameters in the sidebar and click Run to see game theory in action.</p>
             </div>
           ) : (
             <>
-              {/* Stat Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <StatCard label="Agent Coop" value={`${(results.reduce((a, b) => a + b.pctCooperate, 0) / results.length).toFixed(1)}%`} color="indigo" icon={<TrendingUp size={16}/>} />
-                <StatCard label="Opponent Coop" value={`${(results.reduce((a, b) => a + b.oppPctCooperate, 0) / results.length).toFixed(1)}%`} color="pink" icon={<TrendingUp size={16}/>} />
-                <StatCard label="Final Avg Reward" value={(results.slice(-5).reduce((a, b) => a + b.meanReward, 0) / 5).toFixed(2)} color="emerald" icon={<BarChart3 size={16}/>} />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                <MetricCard label="Agent Cooperation" value={`${(results.reduce((a, b) => a + b.pctCooperate, 0) / results.length).toFixed(1)}%`} color="indigo" />
+                <MetricCard label="Opponent Cooperation" value={`${(results.reduce((a, b) => a + b.oppPctCooperate, 0) / results.length).toFixed(1)}%`} color="pink" />
+                <MetricCard label="Avg Payoff (Last 10%)" value={(results.slice(-Math.max(1, Math.floor(results.length/10))).reduce((a, b) => a + b.meanReward, 0) / Math.max(1, Math.floor(results.length/10))).toFixed(2)} color="emerald" />
               </div>
 
-              {/* Main Charts */}
-              <div className="space-y-6">
-                <ChartBox title="Evolution of Cooperation" subtitle="Percentage of turns choosing 'Cooperate' over time">
-                  <ResponsiveContainer width="100%" height={320}>
-                    <LineChart data={results} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis dataKey="block" hide />
-                      <YAxis domain={[0, 100]} unit="%" axisLine={false} tick={{fill: '#94a3b8', fontSize: 12}} />
-                      <Tooltip contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgba(0,0,0,0.1)'}} />
-                      <Legend verticalAlign="top" align="right" iconType="circle" wrapperStyle={{paddingBottom: '20px', fontSize: '12px', fontWeight: 'bold'}} />
-                      <Line type="monotone" dataKey="pctCooperate" name="Agent" stroke="#6366f1" strokeWidth={4} dot={false} animationDuration={1000} />
-                      <Line type="monotone" dataKey="oppPctCooperate" name="Opponent" stroke="#ec4899" strokeWidth={2} strokeDasharray="6 4" dot={false} opacity={0.6} />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </ChartBox>
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <ChartBox title="Mean Reward" subtitle="Payoff per trial block">
-                    <ResponsiveContainer width="100%" height={280}>
-                      <LineChart data={results}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+              <div className="grid grid-cols-1 gap-8">
+                <ChartCard title="Cooperation Dynamics" subtitle="Interaction history over simulated blocks">
+                  <div className="h-[400px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={results}>
+                        <defs>
+                          <linearGradient id="colorAgent" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#6366f1" stopOpacity={0.1}/><stop offset="95%" stopColor="#6366f1" stopOpacity={0}/></linearGradient>
+                          <linearGradient id="colorOpp" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#ec4899" stopOpacity={0.1}/><stop offset="95%" stopColor="#ec4899" stopOpacity={0}/></linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                         <XAxis dataKey="block" hide />
-                        <YAxis axisLine={false} tick={{fill: '#94a3b8', fontSize: 12}} />
-                        <Tooltip />
-                        <Line type="monotone" dataKey="meanReward" name="Reward" stroke="#10b981" strokeWidth={3} dot={false} />
-                      </LineChart>
+                        <YAxis domain={[0, 100]} axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
+                        <Tooltip contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)'}} />
+                        <Legend verticalAlign="top" align="right" wrapperStyle={{paddingBottom: '20px'}} />
+                        <Area type="monotone" dataKey="pctCooperate" name="Agent Coop %" stroke="#6366f1" strokeWidth={3} fillOpacity={1} fill="url(#colorAgent)" />
+                        <Area type="monotone" dataKey="oppPctCooperate" name="Opponent Coop %" stroke="#ec4899" strokeWidth={2} strokeDasharray="5 5" fillOpacity={1} fill="url(#colorOpp)" />
+                      </AreaChart>
                     </ResponsiveContainer>
-                  </ChartBox>
+                  </div>
+                </ChartCard>
 
-                  <ChartBox title="Exploration Parameter" subtitle={`Tracking ${explorationLabel} decay`}>
-                    <ResponsiveContainer width="100%" height={280}>
-                      <LineChart data={results}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                        <XAxis dataKey="block" hide />
-                        <YAxis axisLine={false} tick={{fill: '#94a3b8', fontSize: 12}} />
-                        <Tooltip />
-                        <Line type="monotone" dataKey="meanExplorationParam" name={explorationLabel} stroke="#f59e0b" strokeWidth={3} dot={false} />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </ChartBox>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                  <ChartCard title="Payoff Trend" subtitle="Average score per block">
+                    <div className="h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={results}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                          <XAxis dataKey="block" hide />
+                          <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
+                          <Tooltip />
+                          <Line type="monotone" dataKey="meanReward" name="Payoff" stroke="#10b981" strokeWidth={4} dot={false} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </ChartCard>
+
+                  {isRL && (
+                    <ChartCard title="Internal Value Evolution" subtitle="State-action mapping over time">
+                      <div className="h-[300px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={results}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                            <XAxis dataKey="block" hide />
+                            <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
+                            <Tooltip />
+                            <Legend iconType="circle" wrapperStyle={{fontSize: '10px'}} />
+                            {parameterKeys.map((key, idx) => (
+                              <Line key={key} type="monotone" dataKey={`parameters.${key}`} name={key} stroke={PARAM_COLORS[idx % PARAM_COLORS.length]} strokeWidth={2} dot={false} />
+                            ))}
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </ChartCard>
+                  )}
                 </div>
-
-                {isRL && (
-                  <ChartBox title="Brain Parameter Evolution" subtitle="Internal values (Q/Preferences) across memory states">
-                    <ResponsiveContainer width="100%" height={350}>
-                      <LineChart data={results}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                        <XAxis dataKey="block" hide />
-                        <YAxis axisLine={false} tick={{fill: '#94a3b8', fontSize: 12}} />
-                        <Tooltip />
-                        <Legend verticalAlign="bottom" iconType="rect" wrapperStyle={{fontSize: '10px', paddingTop: '20px'}} />
-                        {parameterKeys.map((key, idx) => (
-                          <Line key={key} type="monotone" dataKey={`parameters.${key}`} name={key} stroke={PARAM_COLORS[idx % PARAM_COLORS.length]} strokeWidth={2} dot={false} />
-                        ))}
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </ChartBox>
-                )}
               </div>
             </>
           )}
         </div>
       </main>
 
-      {/* Save Modal */}
       {isDownloadModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-8 scale-in-center">
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Save Configuration</h2>
-            <p className="text-gray-500 text-sm mb-6">Enter a filename to export these settings as JSON.</p>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-md animate-in fade-in duration-300">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-sm p-10 transform transition-all animate-in zoom-in-95 duration-200">
+            <h2 className="text-2xl font-black text-slate-900 mb-2">Export Data</h2>
+            <p className="text-slate-500 text-sm mb-8 font-medium">Download these settings to repeat the experiment later.</p>
             <input 
               type="text" 
-              className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-indigo-500 mb-6 font-mono"
+              className="w-full px-5 py-4 bg-slate-50 border-2 border-slate-100 rounded-2xl text-sm outline-none focus:border-indigo-500 mb-8 font-bold text-slate-700"
               value={filename}
               onChange={(e) => setFilename(e.target.value)}
-              placeholder="my-experiment.json"
+              placeholder="experiment-name"
               autoFocus
             />
-            <div className="flex gap-3">
-              <button onClick={() => setIsDownloadModalOpen(false)} className="flex-1 px-4 py-3 font-bold text-gray-500 hover:bg-gray-100 rounded-xl transition-colors">Cancel</button>
-              <button onClick={triggerDownload} className="flex-1 px-4 py-3 font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl shadow-lg transition-all active:scale-95">Download</button>
+            <div className="flex gap-4">
+              <button onClick={() => setIsDownloadModalOpen(false)} className="flex-1 px-4 py-4 font-bold text-slate-400 hover:text-slate-600 transition-colors">Cancel</button>
+              <button onClick={triggerDownload} className="flex-2 px-8 py-4 font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-2xl shadow-xl shadow-indigo-100">Download</button>
             </div>
           </div>
         </div>
@@ -357,31 +292,51 @@ const App: React.FC = () => {
   );
 };
 
-const StatCard: React.FC<{ label: string, value: string, color: 'indigo' | 'emerald' | 'pink', icon: React.ReactNode }> = ({ label, value, color, icon }) => {
-  const styles = {
-    indigo: 'text-indigo-600 bg-indigo-50 border-indigo-100',
-    emerald: 'text-emerald-600 bg-emerald-50 border-emerald-100',
-    pink: 'text-pink-600 bg-pink-50 border-pink-100'
+const MetricCard: React.FC<{ label: string, value: string, color: string }> = ({ label, value, color }) => {
+  const styles: any = {
+    indigo: 'bg-indigo-600 text-white shadow-indigo-100',
+    pink: 'bg-pink-600 text-white shadow-pink-100',
+    emerald: 'bg-emerald-600 text-white shadow-emerald-100'
   };
   return (
-    <div className={`p-5 rounded-2xl border shadow-sm ${styles[color]} flex flex-col justify-between h-32`}>
-      <div className="flex justify-between items-start opacity-70">
-        <span className="text-[10px] font-black uppercase tracking-widest">{label}</span>
-        {icon}
-      </div>
-      <h3 className="text-3xl font-black tracking-tight">{value}</h3>
+    <div className={`${styles[color]} p-8 rounded-3xl shadow-2xl flex flex-col justify-between h-40`}>
+      <span className="text-[10px] font-black uppercase tracking-[0.2em] opacity-80">{label}</span>
+      <h3 className="text-4xl font-black tracking-tighter">{value}</h3>
     </div>
   );
 };
 
-const ChartBox: React.FC<{ title: string, subtitle: string, children: React.ReactNode }> = ({ title, subtitle, children }) => (
-  <div className="bg-white p-6 sm:p-8 rounded-3xl border border-gray-200 shadow-sm space-y-4 transition-all hover:shadow-md">
-    <div>
-      <h3 className="text-lg font-black text-gray-900 tracking-tight">{title}</h3>
-      <p className="text-xs font-bold text-gray-400">{subtitle}</p>
+const ChartCard: React.FC<{ title: string, subtitle: string, children: React.ReactNode }> = ({ title, subtitle, children }) => (
+  <div className="bg-white p-8 rounded-[2rem] border border-slate-200/60 shadow-sm hover:shadow-xl hover:shadow-slate-200/20 transition-all duration-300 group">
+    <div className="mb-6">
+      <h3 className="text-xl font-extrabold text-slate-800 tracking-tight group-hover:text-indigo-600 transition-colors">{title}</h3>
+      <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{subtitle}</p>
     </div>
-    <div className="pt-2">{children}</div>
+    {children}
   </div>
 );
 
-export default App;
+const SidebarBtn: React.FC<{ onClick: () => void, icon: React.ReactNode, label: string }> = ({ onClick, icon, label }) => (
+  <button onClick={onClick} className="flex flex-col items-center justify-center gap-1 p-3 bg-slate-50 hover:bg-slate-100 text-slate-500 rounded-xl border border-slate-100 transition-all active:scale-95">
+    {icon}
+    <span className="text-[9px] font-bold uppercase tracking-wider">{label}</span>
+  </button>
+);
+
+const SectionHeader: React.FC<{ icon: React.ReactNode, title: string, className?: string }> = ({ icon, title, className }) => (
+  <h2 className={`text-[10px] font-black uppercase tracking-[0.2em] mb-4 flex items-center gap-2 ${className || 'text-slate-400'}`}>
+    {icon} {title}
+  </h2>
+);
+
+const InputGroup: React.FC<{ label: string, value: any, onChange: (v: string) => void, type?: string, step?: string }> = ({ label, value, onChange, type = "number", step }) => (
+  <div>
+    <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 block">{label}</label>
+    <input 
+      type={type} step={step}
+      className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-medium focus:ring-2 focus:ring-indigo-500 outline-none" 
+      value={value} 
+      onChange={e => onChange(e.target.value)} 
+    />
+  </div>
+);
