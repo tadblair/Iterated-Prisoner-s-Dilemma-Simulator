@@ -239,4 +239,3 @@ export class IPDEngine {
     return { trials, blocks };
   }
 }
-
