@@ -9,7 +9,7 @@ import {
   TrialResult, 
   BlockResult 
 } from '../types';
-import { SeededRNG } from '../utils/rng';
+import { SeededRNG } from './rng';
 
 export class IPDEngine {
   private config: SimulationConfig;
